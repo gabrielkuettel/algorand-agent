@@ -1,0 +1,48 @@
+{
+  "name": "algorand-agent-server",
+  "version": "1.0.0",
+  "description": "MCP server for Algorand blockchain interactions",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "algorand-agent-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && tsc-alias",
+    "prepare": "pnpm run build",
+    "dev": "concurrently \"tsc --watch\" \"tsc-alias --watch\" \"npx -y @modelcontextprotocol/inspector node dist/index.js\"",
+    "inspect": "npx -y @modelcontextprotocol/inspector node dist/index.js",
+    "prepublishOnly": "pnpm build",
+    "docker:build": "docker build -t algorand-mcp .",
+    "docker:tag": "docker tag algorand-mcp gabrielkuettel/algorand-mcp",
+    "docker:push": "docker push gabrielkuettel/algorand-mcp",
+    "publish:npm": "pnpm publish",
+    "publish:docker": "pnpm docker:build && pnpm docker:tag && pnpm docker:push",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "lint": "eslint .",
+    "check-types": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "algorand"
+  ],
+  "author": "",
+  "dependencies": {
+    "@algorandfoundation/algokit-utils": "^8.2.2",
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "algosdk": "^3.2.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@types/node": "^22",
+    "concurrently": "^9.1.2",
+    "shx": "^0.3.4",
+    "tsc-alias": "^1.8.11",
+    "typescript": "^5.6.2"
+  }
+}
