@@ -3,19 +3,13 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'aa__app_update_method_call'
+export const name = 'aa__app_call_method-call'
 export const description =
-  'Update an existing Algorand smart contract application with an ABI method call'
+  'Call a method on an Algorand smart contract using ABI (Application Binary Interface) - recommended for most application calls'
 
 export const schema = z.object({
-  sender: z
-    .string()
-    .describe('The Algorand address that will update the application (must be the creator)'),
-  appId: z.string().describe('The ID of the application to update'),
-  approvalProgram: z.string().describe('The new TEAL approval program code for the application'),
-  clearStateProgram: z
-    .string()
-    .describe('The new TEAL clear state program code for the application'),
+  sender: z.string().describe('The Algorand address that will call the application'),
+  appId: z.string().describe('The ID of the application to call'),
   method: z
     .string()
     .describe(
@@ -83,14 +77,12 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Safety check for mainnet operations
       if (network === 'mainnet') {
-        console.error('Warning: Application update requested on mainnet')
+        console.error('Warning: Application method call requested on mainnet')
       }
 
       const {
         sender,
         appId,
-        approvalProgram,
-        clearStateProgram,
         method,
         methodArgs = [],
         onComplete,
@@ -105,12 +97,10 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       // Parse the method signature to create an ABIMethod object
       const abiMethod = algosdk.ABIMethod.fromSignature(method)
 
-      // Create the transaction parameters
+      // Create and send the transaction
       const txParams: any = {
         sender,
         appId: BigInt(appId),
-        approvalProgram,
-        clearStateProgram,
         method: abiMethod,
         args: methodArgs,
         suppressLog: true,
@@ -155,7 +145,7 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
 
       // Send the transaction
-      const result = await algorand.send.appUpdateMethodCall(txParams)
+      const result = await algorand.send.appCallMethodCall(txParams)
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
 
@@ -183,17 +173,16 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Format the response
       const appDetails = [
-        `Application Updated Successfully:`,
+        `Application Method Call Successful:`,
         ``,
         `Application ID: ${appId}`,
-        `Updater: ${sender}`,
-        `Method Called: ${method}`,
+        `Caller: ${sender}`,
+        `Method: ${method}`,
         `Arguments: ${methodArgs.length > 0 ? methodArgs.join(', ') : 'None'}`,
         `On Complete: ${onComplete || 'NoOp'}`,
         ``,
         `Transaction Details:`,
         `Transaction ID: ${txId}`,
-        `Confirmation Round: ${txInfo?.confirmedRound || 'Pending'}`,
         ``,
         ...returnDetails,
       ]
@@ -220,13 +209,13 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
     } catch (error: any) {
       const errorMessage = error.message || String(error)
-      console.error('Error updating application:', errorMessage)
+      console.error('Error calling application method:', errorMessage)
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error updating application: ${errorMessage}`,
+            text: `Error calling application method: ${errorMessage}`,
           },
         ],
         isError: true,

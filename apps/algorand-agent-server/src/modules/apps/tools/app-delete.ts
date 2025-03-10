@@ -3,28 +3,19 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'aa__app_update_method_call'
+export const name = 'aa__app_delete'
 export const description =
-  'Update an existing Algorand smart contract application with an ABI method call'
+  'Delete an Algorand smart contract application using bare (non-ABI) calls - useful for raw TEAL without ARC-4/ABI requirements'
 
 export const schema = z.object({
   sender: z
     .string()
-    .describe('The Algorand address that will update the application (must be the creator)'),
-  appId: z.string().describe('The ID of the application to update'),
-  approvalProgram: z.string().describe('The new TEAL approval program code for the application'),
-  clearStateProgram: z
-    .string()
-    .describe('The new TEAL clear state program code for the application'),
-  method: z
-    .string()
-    .describe(
-      "The ABI method signature (e.g., 'add(uint64,uint64)uint64', 'greet()string', 'hello(string)void')"
-    ),
-  methodArgs: z
+    .describe('The Algorand address that will delete the application (must be the creator)'),
+  appId: z.string().describe('The ID of the application to delete'),
+  appArgs: z
     .array(z.string())
     .optional()
-    .describe('Arguments for the method call, matching the types in the method signature'),
+    .describe('Arguments for the application call (base64 or UTF-8 strings)'),
   onComplete: z
     .enum(['NoOp', 'OptIn', 'CloseOut'])
     .optional()
@@ -72,6 +63,17 @@ function getOnCompleteEnum(onComplete?: string): algosdk.OnApplicationComplete {
   }
 }
 
+// Helper function to convert string to Uint8Array (either base64 or UTF-8)
+function stringToUint8Array(str: string): Uint8Array {
+  try {
+    // Try to decode as base64 first
+    return Buffer.from(str, 'base64')
+  } catch {
+    // If not base64, treat as UTF-8
+    return Buffer.from(str, 'utf-8')
+  }
+}
+
 export function createHandler(networkContext: NetworkContext): ToolCallback<typeof schema.shape> {
   return async params => {
     try {
@@ -83,16 +85,13 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Safety check for mainnet operations
       if (network === 'mainnet') {
-        console.error('Warning: Application update requested on mainnet')
+        console.error('Warning: Application deletion requested on mainnet')
       }
 
       const {
         sender,
         appId,
-        approvalProgram,
-        clearStateProgram,
-        method,
-        methodArgs = [],
+        appArgs = [],
         onComplete,
         accountReferences,
         appReferences,
@@ -102,23 +101,21 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         lease,
       } = params
 
-      // Parse the method signature to create an ABIMethod object
-      const abiMethod = algosdk.ABIMethod.fromSignature(method)
-
       // Create the transaction parameters
       const txParams: any = {
         sender,
         appId: BigInt(appId),
-        approvalProgram,
-        clearStateProgram,
-        method: abiMethod,
-        args: methodArgs,
+        args: appArgs.map(arg => stringToUint8Array(arg)),
         suppressLog: true,
+        onComplete: algosdk.OnApplicationComplete.DeleteApplicationOC,
       }
 
       // Add optional parameters
       if (onComplete) {
-        txParams.onComplete = getOnCompleteEnum(onComplete)
+        // Note: For delete, we always use DeleteApplicationOC regardless of what's passed
+        console.warn(
+          'Ignoring onComplete parameter for delete operation, using DeleteApplicationOC'
+        )
       }
 
       if (accountReferences && accountReferences.length > 0) {
@@ -155,7 +152,7 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
 
       // Send the transaction
-      const result = await algorand.send.appUpdateMethodCall(txParams)
+      const result = await algorand.send.appDelete(txParams)
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
 
@@ -183,13 +180,11 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Format the response
       const appDetails = [
-        `Application Updated Successfully:`,
+        `Application Deleted Successfully:`,
         ``,
         `Application ID: ${appId}`,
-        `Updater: ${sender}`,
-        `Method Called: ${method}`,
-        `Arguments: ${methodArgs.length > 0 ? methodArgs.join(', ') : 'None'}`,
-        `On Complete: ${onComplete || 'NoOp'}`,
+        `Deleter: ${sender}`,
+        `Arguments: ${appArgs.length > 0 ? appArgs.join(', ') : 'None'}`,
         ``,
         `Transaction Details:`,
         `Transaction ID: ${txId}`,
@@ -220,13 +215,13 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
     } catch (error: any) {
       const errorMessage = error.message || String(error)
-      console.error('Error updating application:', errorMessage)
+      console.error('Error deleting application:', errorMessage)
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error updating application: ${errorMessage}`,
+            text: `Error deleting application: ${errorMessage}`,
           },
         ],
         isError: true,

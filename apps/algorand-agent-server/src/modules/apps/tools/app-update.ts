@@ -3,22 +3,23 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'aa__app_call_method'
+export const name = 'aa__app_update'
 export const description =
-  'Call a method on an Algorand smart contract using ABI (Application Binary Interface) - recommended for most application calls'
+  'Update an existing Algorand smart contract application using bare (non-ABI) calls - useful for raw TEAL without ARC-4/ABI requirements'
 
 export const schema = z.object({
-  sender: z.string().describe('The Algorand address that will call the application'),
-  appId: z.string().describe('The ID of the application to call'),
-  method: z
+  sender: z
     .string()
-    .describe(
-      "The ABI method signature (e.g., 'add(uint64,uint64)uint64', 'greet()string', 'hello(string)void')"
-    ),
-  methodArgs: z
+    .describe('The Algorand address that will update the application (must be the creator)'),
+  appId: z.string().describe('The ID of the application to update'),
+  approvalProgram: z.string().describe('The new TEAL approval program code for the application'),
+  clearStateProgram: z
+    .string()
+    .describe('The new TEAL clear state program code for the application'),
+  appArgs: z
     .array(z.string())
     .optional()
-    .describe('Arguments for the method call, matching the types in the method signature'),
+    .describe('Arguments for the application call (base64 or UTF-8 strings)'),
   onComplete: z
     .enum(['NoOp', 'OptIn', 'CloseOut'])
     .optional()
@@ -66,6 +67,17 @@ function getOnCompleteEnum(onComplete?: string): algosdk.OnApplicationComplete {
   }
 }
 
+// Helper function to convert string to Uint8Array (either base64 or UTF-8)
+function stringToUint8Array(str: string): Uint8Array {
+  try {
+    // Try to decode as base64 first
+    return Buffer.from(str, 'base64')
+  } catch {
+    // If not base64, treat as UTF-8
+    return Buffer.from(str, 'utf-8')
+  }
+}
+
 export function createHandler(networkContext: NetworkContext): ToolCallback<typeof schema.shape> {
   return async params => {
     try {
@@ -77,14 +89,15 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Safety check for mainnet operations
       if (network === 'mainnet') {
-        console.error('Warning: Application method call requested on mainnet')
+        console.error('Warning: Application update requested on mainnet')
       }
 
       const {
         sender,
         appId,
-        method,
-        methodArgs = [],
+        approvalProgram,
+        clearStateProgram,
+        appArgs = [],
         onComplete,
         accountReferences,
         appReferences,
@@ -94,21 +107,23 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         lease,
       } = params
 
-      // Parse the method signature to create an ABIMethod object
-      const abiMethod = algosdk.ABIMethod.fromSignature(method)
-
-      // Create and send the transaction
+      // Create the transaction parameters
       const txParams: any = {
         sender,
         appId: BigInt(appId),
-        method: abiMethod,
-        args: methodArgs,
+        approvalProgram,
+        clearStateProgram,
+        args: appArgs.map(arg => stringToUint8Array(arg)),
         suppressLog: true,
+        onComplete: algosdk.OnApplicationComplete.UpdateApplicationOC,
       }
 
       // Add optional parameters
       if (onComplete) {
-        txParams.onComplete = getOnCompleteEnum(onComplete)
+        // Note: For update, we always use UpdateApplicationOC regardless of what's passed
+        console.warn(
+          'Ignoring onComplete parameter for update operation, using UpdateApplicationOC'
+        )
       }
 
       if (accountReferences && accountReferences.length > 0) {
@@ -145,60 +160,57 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
 
       // Send the transaction
-      const result = await algorand.send.appCallMethodCall(txParams)
+      const result = await algorand.send.appUpdate(txParams)
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
 
-      // Extract logs if available
-      let logs: string[] = []
-      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
-        logs = txInfo.logs.map((log: Uint8Array) => {
-          try {
-            // Try to decode as UTF-8 string
-            return Buffer.from(log).toString('utf-8')
-          } catch (e) {
-            // Return as base64 if not valid UTF-8
-            return Buffer.from(log).toString('base64')
-          }
-        })
-      }
-
-      // For ABI method calls, we don't have direct access to return values
-      // in the transaction response, so we'll extract them from logs if possible
+      // Get the return value directly if available
       let returnValue = 'No return value'
-      if (logs.length > 0) {
-        // The last log entry might contain the return value
-        try {
-          const lastLog = logs[logs.length - 1]
-          // Try to parse as JSON in case it's a structured return value
-          const parsedLog = JSON.parse(lastLog)
-          returnValue = JSON.stringify(parsedLog)
-        } catch (e) {
-          // If not JSON, use the last log as the return value
-          returnValue = logs[logs.length - 1]
+      let returnDetails = []
+
+      if (result.return !== undefined) {
+        if (result.return.decodeError === undefined) {
+          // Successfully decoded return value
+          returnValue = JSON.stringify(result.return.returnValue)
+          returnDetails = [
+            `Method Return Value:`,
+            returnValue,
+            `Return Type: ${result.return.method.returns?.type?.toString() || 'void'}`,
+          ]
+        } else {
+          // There was an error decoding the return value
+          returnValue = `Error decoding return value: ${result.return.decodeError.message}`
+          returnDetails = [`Method Return Error:`, returnValue]
         }
+      } else {
+        returnDetails = [`Method Return Value:`, returnValue]
       }
 
       // Format the response
       const appDetails = [
-        `Application Method Call Successful:`,
+        `Application Updated Successfully:`,
         ``,
         `Application ID: ${appId}`,
-        `Caller: ${sender}`,
-        `Method: ${method}`,
-        `Arguments: ${methodArgs.length > 0 ? methodArgs.join(', ') : 'None'}`,
-        `On Complete: ${onComplete || 'NoOp'}`,
+        `Updater: ${sender}`,
+        `Arguments: ${appArgs.length > 0 ? appArgs.join(', ') : 'None'}`,
         ``,
         `Transaction Details:`,
         `Transaction ID: ${txId}`,
+        `Confirmation Round: ${txInfo?.confirmedRound || 'Pending'}`,
+        ``,
+        ...returnDetails,
       ]
 
-      // Add return value if available
-      appDetails.push(``, `Method Return Value:`, returnValue)
-
-      // Add logs if available
-      if (logs.length > 0) {
-        appDetails.push(``, `Application Logs:`, ...logs.map(log => `- ${log}`))
+      // Add raw logs to the response
+      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
+        appDetails.push(
+          ``,
+          `Raw Transaction Logs:`,
+          ...txInfo.logs.map(
+            log =>
+              `- ${Buffer.from(log).toString('utf-8')} (hex: ${Buffer.from(log).toString('hex')})`
+          )
+        )
       }
 
       return {
@@ -210,28 +222,14 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         ],
       }
     } catch (error: any) {
-      // Enhanced error handling
-      let errorMessage = error.message || String(error)
-      let helpfulTip = ''
-
-      if (errorMessage.includes('invalid ApplicationArgs index')) {
-        helpfulTip =
-          "This error typically occurs when trying to access application arguments that weren't provided. Make sure you're passing the required arguments."
-      } else if (errorMessage.includes('err opcode executed')) {
-        helpfulTip =
-          "The contract explicitly rejected the transaction with an 'err' opcode. Check your TEAL logic and arguments."
-      } else if (errorMessage.includes('return arg 0 wanted type uint64')) {
-        helpfulTip =
-          "TEAL expects method returns to be properly formatted. For strings, use 'log' instead of direct returns, or implement proper ARC-4 return formatting."
-      }
+      const errorMessage = error.message || String(error)
+      console.error('Error updating application:', errorMessage)
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error calling application method: ${errorMessage}\n\n${
-              helpfulTip ? `Tip: ${helpfulTip}` : ''
-            }`,
+            text: `Error updating application: ${errorMessage}`,
           },
         ],
         isError: true,

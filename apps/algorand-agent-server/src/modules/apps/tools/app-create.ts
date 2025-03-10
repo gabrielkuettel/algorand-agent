@@ -3,28 +3,23 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'aa__app_update_method_call'
+export const name = 'aa__app_create'
 export const description =
-  'Update an existing Algorand smart contract application with an ABI method call'
+  'Create a new Algorand smart contract application using bare (non-ABI) calls - useful for raw TEAL without ARC-4/ABI requirements'
 
 export const schema = z.object({
-  sender: z
-    .string()
-    .describe('The Algorand address that will update the application (must be the creator)'),
-  appId: z.string().describe('The ID of the application to update'),
-  approvalProgram: z.string().describe('The new TEAL approval program code for the application'),
-  clearStateProgram: z
-    .string()
-    .describe('The new TEAL clear state program code for the application'),
-  method: z
-    .string()
-    .describe(
-      "The ABI method signature (e.g., 'add(uint64,uint64)uint64', 'greet()string', 'hello(string)void')"
-    ),
-  methodArgs: z
+  sender: z.string().describe('The Algorand address that will create the application'),
+  approvalProgram: z.string().describe('The TEAL approval program code for the application'),
+  clearStateProgram: z.string().describe('The TEAL clear state program code for the application'),
+  appArgs: z
     .array(z.string())
     .optional()
-    .describe('Arguments for the method call, matching the types in the method signature'),
+    .describe('Arguments for the application call (base64 or UTF-8 strings)'),
+  globalInts: z.number().optional().describe('Number of global integer variables (default: 0)'),
+  globalBytes: z.number().optional().describe('Number of global byte slice variables (default: 0)'),
+  localInts: z.number().optional().describe('Number of local integer variables (default: 0)'),
+  localBytes: z.number().optional().describe('Number of local byte slice variables (default: 0)'),
+  extraPages: z.number().optional().describe('Number of extra program pages (default: 0)'),
   onComplete: z
     .enum(['NoOp', 'OptIn', 'CloseOut'])
     .optional()
@@ -72,6 +67,17 @@ function getOnCompleteEnum(onComplete?: string): algosdk.OnApplicationComplete {
   }
 }
 
+// Helper function to convert string to Uint8Array (either base64 or UTF-8)
+function stringToUint8Array(str: string): Uint8Array {
+  try {
+    // Try to decode as base64 first
+    return Buffer.from(str, 'base64')
+  } catch {
+    // If not base64, treat as UTF-8
+    return Buffer.from(str, 'utf-8')
+  }
+}
+
 export function createHandler(networkContext: NetworkContext): ToolCallback<typeof schema.shape> {
   return async params => {
     try {
@@ -83,16 +89,19 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Safety check for mainnet operations
       if (network === 'mainnet') {
-        console.error('Warning: Application update requested on mainnet')
+        console.error('Warning: Application creation requested on mainnet')
       }
 
       const {
         sender,
-        appId,
         approvalProgram,
         clearStateProgram,
-        method,
-        methodArgs = [],
+        appArgs = [],
+        globalInts,
+        globalBytes,
+        localInts,
+        localBytes,
+        extraPages,
         onComplete,
         accountReferences,
         appReferences,
@@ -102,18 +111,33 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         lease,
       } = params
 
-      // Parse the method signature to create an ABIMethod object
-      const abiMethod = algosdk.ABIMethod.fromSignature(method)
-
       // Create the transaction parameters
       const txParams: any = {
         sender,
-        appId: BigInt(appId),
         approvalProgram,
         clearStateProgram,
-        method: abiMethod,
-        args: methodArgs,
+        args: appArgs.map(arg => stringToUint8Array(arg)),
         suppressLog: true,
+      }
+
+      // Add schema if provided
+      if (
+        globalInts !== undefined ||
+        globalBytes !== undefined ||
+        localInts !== undefined ||
+        localBytes !== undefined
+      ) {
+        txParams.schema = {
+          globalInts: globalInts || 0,
+          globalByteSlices: globalBytes || 0,
+          localInts: localInts || 0,
+          localByteSlices: localBytes || 0,
+        }
+      }
+
+      // Add extra pages if provided
+      if (extraPages !== undefined) {
+        txParams.extraProgramPages = extraPages
       }
 
       // Add optional parameters
@@ -155,9 +179,12 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
 
       // Send the transaction
-      const result = await algorand.send.appUpdateMethodCall(txParams)
+      const result = await algorand.send.appCreate(txParams)
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
+
+      // Get the application ID
+      const appId = txInfo?.applicationIndex || 'unknown'
 
       // Get the return value directly if available
       let returnValue = 'No return value'
@@ -183,12 +210,11 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Format the response
       const appDetails = [
-        `Application Updated Successfully:`,
+        `Application Created Successfully:`,
         ``,
         `Application ID: ${appId}`,
-        `Updater: ${sender}`,
-        `Method Called: ${method}`,
-        `Arguments: ${methodArgs.length > 0 ? methodArgs.join(', ') : 'None'}`,
+        `Creator: ${sender}`,
+        `Arguments: ${appArgs.length > 0 ? appArgs.join(', ') : 'None'}`,
         `On Complete: ${onComplete || 'NoOp'}`,
         ``,
         `Transaction Details:`,
@@ -220,13 +246,13 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
     } catch (error: any) {
       const errorMessage = error.message || String(error)
-      console.error('Error updating application:', errorMessage)
+      console.error('Error creating application:', errorMessage)
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error updating application: ${errorMessage}`,
+            text: `Error creating application: ${errorMessage}`,
           },
         ],
         isError: true,

@@ -185,34 +185,26 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       // Get the application ID
       const appId = txInfo?.applicationIndex || 'unknown'
 
-      // Extract logs if available
-      let logs: string[] = []
-      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
-        logs = txInfo.logs.map((log: Uint8Array) => {
-          try {
-            // Try to decode as UTF-8 string
-            return Buffer.from(log).toString('utf-8')
-          } catch (e) {
-            // Return as base64 if not valid UTF-8
-            return Buffer.from(log).toString('base64')
-          }
-        })
-      }
-
-      // For ABI method calls, we don't have direct access to return values
-      // in the transaction response, so we'll extract them from logs if possible
+      // Get the return value directly if available
       let returnValue = 'No return value'
-      if (logs.length > 0) {
-        // The last log entry might contain the return value
-        try {
-          const lastLog = logs[logs.length - 1]
-          // Try to parse as JSON in case it's a structured return value
-          const parsedLog = JSON.parse(lastLog)
-          returnValue = JSON.stringify(parsedLog)
-        } catch (e) {
-          // If not JSON, use the last log as the return value
-          returnValue = logs[logs.length - 1]
+      let returnDetails = []
+
+      if (result.return !== undefined) {
+        if (result.return.decodeError === undefined) {
+          // Successfully decoded return value
+          returnValue = JSON.stringify(result.return.returnValue)
+          returnDetails = [
+            `Method Return Value:`,
+            returnValue,
+            `Return Type: ${result.return.method.returns?.type?.toString() || 'void'}`,
+          ]
+        } else {
+          // There was an error decoding the return value
+          returnValue = `Error decoding return value: ${result.return.decodeError.message}`
+          returnDetails = [`Method Return Error:`, returnValue]
         }
+      } else {
+        returnDetails = [`Method Return Value:`, returnValue]
       }
 
       // Format the response
@@ -228,14 +220,20 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         `Transaction Details:`,
         `Transaction ID: ${txId}`,
         `Confirmation Round: ${txInfo?.confirmedRound || 'Pending'}`,
+        ``,
+        ...returnDetails,
       ]
 
-      // Add return value if available
-      appDetails.push(``, `Method Return Value:`, returnValue)
-
-      // Add logs if available
-      if (logs.length > 0) {
-        appDetails.push(``, `Application Logs:`, ...logs.map(log => `- ${log}`))
+      // Add raw logs to the response
+      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
+        appDetails.push(
+          ``,
+          `Raw Transaction Logs:`,
+          ...txInfo.logs.map(
+            log =>
+              `- ${Buffer.from(log).toString('utf-8')} (hex: ${Buffer.from(log).toString('hex')})`
+          )
+        )
       }
 
       return {
@@ -247,31 +245,14 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         ],
       }
     } catch (error: any) {
-      // Enhanced error handling
-      let errorMessage = error.message || String(error)
-      let helpfulTip = ''
-
-      if (errorMessage.includes('invalid ApplicationArgs index')) {
-        helpfulTip =
-          "This error typically occurs when trying to access application arguments that weren't provided. Make sure you're passing the required arguments."
-      } else if (errorMessage.includes('err opcode executed')) {
-        helpfulTip =
-          "The contract explicitly rejected the transaction with an 'err' opcode. Check your TEAL logic and arguments."
-      } else if (errorMessage.includes('return arg 0 wanted type uint64')) {
-        helpfulTip =
-          "TEAL expects method returns to be properly formatted. For strings, use 'log' instead of direct returns, or implement proper ARC-4 return formatting."
-      } else if (errorMessage.includes('program assembly failed')) {
-        helpfulTip =
-          "There's a syntax error in your TEAL code. Check for typos, missing opcodes, or incorrect arguments."
-      }
+      const errorMessage = error.message || String(error)
+      console.error('Error creating application:', errorMessage)
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error creating application: ${errorMessage}\n\n${
-              helpfulTip ? `Tip: ${helpfulTip}` : ''
-            }`,
+            text: `Error creating application: ${errorMessage}`,
           },
         ],
         isError: true,
