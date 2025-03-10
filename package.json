@@ -1,5 +1,5 @@
 {
-  "name": "my-turborepo",
+  "name": "algorand-agent",
   "private": true,
   "scripts": {
     "build": "turbo run build",
