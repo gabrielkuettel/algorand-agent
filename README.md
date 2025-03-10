@@ -23,9 +23,9 @@ This Turborepo includes the following packages/apps:
 
 Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
 
-### Algorand Agent Server
+### algorand-agent-server
 
-The Algorand Agent Server implements the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) for Algorand blockchain integration with Claude Desktop, Cursor, and other LLM clients that support MCP.
+The algorand-agent-server implements the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) for Algorand blockchain integration with Claude Desktop, Cursor, and other LLM clients that support MCP.
 
 Key features:
 
@@ -37,7 +37,7 @@ Key features:
 - **LocalNet Dispenser**: Easily fund accounts on LocalNet for development and testing
 - **Blockchain Explorer Integration**: Generate URLs to view transactions, accounts, assets, and applications in Lora Explorer
 
-For complete setup instructions and detailed documentation for the MCP server, see the [Algorand Agent Server README](apps/algorand-agent-server/README.md).
+For complete setup instructions and detailed documentation for the MCP server, see the [algorand-agent-server README](apps/algorand-agent-server/README.md).
 
 ### Build
 

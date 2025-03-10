@@ -6,9 +6,7 @@ import { NetworkContext } from '@/common/network-context.js'
 export const name = 'aa__generate_account'
 export const description = 'Generate a new random Algorand account'
 
-export const schema = z.object({
-  random_string: z.string().describe('Dummy parameter for no-parameter tools'),
-})
+export const schema = z.object({})
 
 export function createHandler(networkContext: NetworkContext): ToolCallback<typeof schema.shape> {
   return async () => {

@@ -82,7 +82,7 @@ Configure in Claude Desktop (`~/Library/Application\ Support/Claude/claude_deskt
   "mcpServers": {
     "algorand-agent": {
       "command": "npx",
-      "args": ["-y", "algorand-mcp"]
+      "args": ["-y", "algorand-agent-server"]
     }
   }
 }
@@ -97,7 +97,7 @@ Configure in Claude Desktop:
   "mcpServers": {
     "algorand-agent": {
       "command": "docker",
-      "args": ["run", "-i", "--rm", "gabrielkuettel/algorand-mcp"]
+      "args": ["run", "-i", "--rm", "gabrielkuettel/algorand-agent-server"]
     }
   }
 }
@@ -112,12 +112,12 @@ You can also use this MCP server with [Cursor](https://cursor.com/), an AI-power
 1. Open Cursor and go to `Cursor Settings` > `Features` > `MCP`
 2. Click on the `+ Add New MCP Server` button
 3. Fill out the form:
-   - **Name**: `algorand-mcp` (or any name you prefer)
+   - **Name**: `algorand-agent-server` (or any name you prefer)
    - **Type**: Select `stdio` from the dropdown
    - **Command**: Enter one of the following commands:
-     - Using npx: `npx -y algorand-mcp`
-     - Using local build: `node /absolute/path/to/your/algorand-mcp/dist/index.js`
-     - Using Docker: `docker run -i --rm gabrielkuettel/algorand-mcp`
+     - Using npx: `npx -y algorand-agent-server`
+     - Using local build: `node /absolute/path/to/your/algorand-agent-server/dist/index.js`
+     - Using Docker: `docker run -i --rm gabrielkuettel/algorand-agent-server`
 
 #### Project-specific Configuration
 
@@ -128,7 +128,7 @@ You can also configure project-specific MCP servers in Cursor using a `.cursor/m
   "mcpServers": {
     "algorand-agent": {
       "command": "npx",
-      "args": ["-y", "algorand-mcp"]
+      "args": ["-y", "algorand-agent-server"]
     }
   }
 }
@@ -148,8 +148,8 @@ For more detailed instructions on configuring and using MCP servers with Cursor,
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/algorand-mcp.git
-cd algorand-mcp
+git clone https://github.com/gabrielkuettel/algorand-agent
+cd algorand-agent-server
 
 # Install dependencies
 pnpm install
@@ -183,7 +183,7 @@ While developing, you'll want to point Claude Desktop directly to your local bui
   "mcpServers": {
     "algorand": {
       "command": "node",
-      "args": ["/absolute/path/to/your/algorand-mcp/dist/index.js"]
+      "args": ["/absolute/path/to/your/algorand-agent-server/dist/index.js"]
     }
   }
 }
@@ -246,10 +246,10 @@ If you're developing with Docker:
 
 ```bash
 # Build the image locally
-docker build -t algorand-mcp .
+docker build -t algorand-agent-server .
 
 # Test your changes
-docker run -i --rm algorand-mcp
+docker run -i --rm algorand-agent-server
 ```
 
 ### Publishing
