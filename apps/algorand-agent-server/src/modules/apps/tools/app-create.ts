@@ -3,56 +3,111 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'aa__app_create'
+export const name = 'mcp__app_create'
 export const description =
   'Create a new Algorand smart contract application using bare (non-ABI) calls - useful for raw TEAL without ARC-4/ABI requirements'
 
 export const schema = z.object({
-  sender: z.string().describe('The Algorand address that will create the application'),
-  approvalProgram: z.string().describe('The TEAL approval program code for the application'),
-  clearStateProgram: z.string().describe('The TEAL clear state program code for the application'),
+  sender: z
+    .string()
+    .describe(
+      'The Algorand address that will create the application (standard format starting with a letter)'
+    ),
+  approvalProgram: z
+    .string()
+    .describe(
+      'The TEAL approval program code for the application (must be valid TEAL code starting with "#pragma version 8" or higher)'
+    ),
+  clearStateProgram: z
+    .string()
+    .describe(
+      'The TEAL clear state program code for the application (must be valid TEAL code starting with "#pragma version 8" or higher)'
+    ),
   appArgs: z
     .array(z.string())
     .optional()
-    .describe('Arguments for the application call (base64 or UTF-8 strings)'),
-  globalInts: z.number().optional().describe('Number of global integer variables (default: 0)'),
-  globalBytes: z.number().optional().describe('Number of global byte slice variables (default: 0)'),
-  localInts: z.number().optional().describe('Number of local integer variables (default: 0)'),
-  localBytes: z.number().optional().describe('Number of local byte slice variables (default: 0)'),
-  extraPages: z.number().optional().describe('Number of extra program pages (default: 0)'),
+    .describe(
+      'Arguments for the application call (strings will be encoded as UTF-8 or base64 bytes; numeric values should be passed as strings, e.g., "123")'
+    ),
+  globalInts: z
+    .number()
+    .optional()
+    .describe(
+      'Number of global integer variables (default: 0, max: 64). Each global int uses 8 bytes of storage.'
+    ),
+  globalBytes: z
+    .number()
+    .optional()
+    .describe(
+      'Number of global byte slice variables (default: 0, max: 64). Each global byte slice can store up to 128 bytes.'
+    ),
+  localInts: z
+    .number()
+    .optional()
+    .describe(
+      'Number of local integer variables per account (default: 0, max: 16). Each local int uses 8 bytes of storage.'
+    ),
+  localBytes: z
+    .number()
+    .optional()
+    .describe(
+      'Number of local byte slice variables per account (default: 0, max: 16). Each local byte slice can store up to 128 bytes.'
+    ),
+  extraPages: z
+    .number()
+    .optional()
+    .describe(
+      'Number of extra program pages (default: 0, max: 3). Each page provides 2KB of program space beyond the first 2KB.'
+    ),
   onComplete: z
     .enum(['NoOp', 'OptIn', 'CloseOut'])
     .optional()
-    .describe('The on-completion action for this transaction (default: NoOp)'),
+    .describe(
+      'The on-completion action for this transaction (default: NoOp). Determines what happens after application creation.'
+    ),
   accountReferences: z
     .array(z.string())
     .optional()
-    .describe('Account addresses to be referenced in the transaction'),
+    .describe(
+      'Account addresses to be referenced in the transaction (accessible via "txna Accounts i" in TEAL)'
+    ),
   appReferences: z
     .array(z.string())
     .optional()
-    .describe('Application IDs to be referenced in the transaction'),
+    .describe(
+      'Application IDs to be referenced in the transaction (accessible via "txna Applications i" in TEAL)'
+    ),
   assetReferences: z
     .array(z.string())
     .optional()
-    .describe('Asset IDs to be referenced in the transaction'),
+    .describe(
+      'Asset IDs to be referenced in the transaction (accessible via "txna Assets i" in TEAL)'
+    ),
   boxReferences: z
     .array(
       z.union([
-        z.string().describe('Box name'),
+        z.string().describe('Box name (will be encoded as UTF-8 bytes)'),
         z.object({
-          name: z.string().describe('Box name'),
-          appId: z.string().optional().describe('Application ID (defaults to the called app)'),
+          name: z.string().describe('Box name (will be encoded as UTF-8 bytes)'),
+          appId: z
+            .string()
+            .optional()
+            .describe('Application ID (defaults to the called app if not specified)'),
         }),
       ])
     )
     .optional()
-    .describe('Box references to be included in the transaction'),
-  note: z.string().optional().describe('Optional note to include with the transaction'),
+    .describe('Box references to be included in the transaction (for accessing app box storage)'),
+  note: z
+    .string()
+    .optional()
+    .describe('Optional note to include with the transaction (will be encoded as UTF-8 bytes)'),
   lease: z
     .string()
     .optional()
-    .describe('Optional lease value (base64-encoded) to enforce mutual exclusion of transactions'),
+    .describe(
+      'Optional lease value (base64-encoded) to enforce mutual exclusion of transactions (prevents duplicate submissions)'
+    ),
 })
 
 // Helper function to convert onComplete string to algosdk enum
@@ -65,6 +120,16 @@ function getOnCompleteEnum(onComplete?: string): algosdk.OnApplicationComplete {
     default:
       return algosdk.OnApplicationComplete.NoOpOC
   }
+}
+
+// Helper function to validate TEAL pragma version is 8 or higher
+function validateTealPragmaVersion(tealCode: string): boolean {
+  const pragmaMatch = tealCode.match(/#pragma\s+version\s+(\d+)/)
+  if (!pragmaMatch) {
+    return false
+  }
+  const version = parseInt(pragmaMatch[1], 10)
+  return version >= 8
 }
 
 // Helper function to convert string to Uint8Array (either base64 or UTF-8)
@@ -90,6 +155,22 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       // Safety check for mainnet operations
       if (network === 'mainnet') {
         console.error('Warning: Application creation requested on mainnet')
+      }
+
+      // Validate TEAL pragma versions
+      const approvalVersionValid = validateTealPragmaVersion(params.approvalProgram)
+      const clearStateVersionValid = validateTealPragmaVersion(params.clearStateProgram)
+
+      if (!approvalVersionValid || !clearStateVersionValid) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Error creating application: TEAL code must use #pragma version 8 or higher for both approval and clear state programs',
+            },
+          ],
+          isError: true,
+        }
       }
 
       const {
@@ -186,6 +267,33 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       // Get the application ID
       const appId = txInfo?.applicationIndex || 'unknown'
 
+      // Extract logs if available
+      let logs: string[] = []
+      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
+        logs = txInfo.logs.map((log: Uint8Array) => {
+          try {
+            // Try to decode as UTF-8 string
+            const decoded = Buffer.from(log).toString('utf-8')
+            // Try to parse as JSON if it looks like JSON
+            if (
+              (decoded.startsWith('{') && decoded.endsWith('}')) ||
+              (decoded.startsWith('[') && decoded.endsWith(']'))
+            ) {
+              try {
+                const parsed = JSON.parse(decoded)
+                return `${JSON.stringify(parsed, null, 2)} (hex: ${Buffer.from(log).toString('hex')})`
+              } catch {
+                return `${decoded} (hex: ${Buffer.from(log).toString('hex')})`
+              }
+            }
+            return `${decoded} (hex: ${Buffer.from(log).toString('hex')})`
+          } catch (e) {
+            // Return as base64 if not valid UTF-8
+            return `Base64: ${Buffer.from(log).toString('base64')} (hex: ${Buffer.from(log).toString('hex')})`
+          }
+        })
+      }
+
       // Get the return value directly if available
       let returnValue = 'No return value'
       let returnDetails = []
@@ -224,16 +332,11 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         ...returnDetails,
       ]
 
-      // Add raw logs to the response
-      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
-        appDetails.push(
-          ``,
-          `Raw Transaction Logs:`,
-          ...txInfo.logs.map(
-            log =>
-              `- ${Buffer.from(log).toString('utf-8')} (hex: ${Buffer.from(log).toString('hex')})`
-          )
-        )
+      // Add logs if available
+      if (logs.length > 0) {
+        appDetails.push(``, `Raw Transaction Logs:`, ...logs.map(log => `- ${log}`))
+      } else {
+        appDetails.push(``, `Raw Transaction Logs:`, `- No logs found in this transaction`)
       }
 
       return {

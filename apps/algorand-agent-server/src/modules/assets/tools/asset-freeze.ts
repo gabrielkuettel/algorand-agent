@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'aa__asset_freeze'
+export const name = 'mcp__asset_freeze'
 export const description =
   'Freeze or unfreeze an Algorand Standard Asset (ASA) for a specific account'
 

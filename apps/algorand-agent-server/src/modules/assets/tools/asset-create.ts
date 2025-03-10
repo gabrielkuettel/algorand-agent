@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'aa__asset_create'
+export const name = 'mcp__asset_create'
 export const description = 'Create a new Algorand Standard Asset (ASA)'
 
 export const schema = z.object({

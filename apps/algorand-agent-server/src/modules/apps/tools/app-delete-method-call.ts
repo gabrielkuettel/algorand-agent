@@ -3,56 +3,78 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'aa__app_delete_method_call'
+export const name = 'mcp__app_delete_method_call'
 export const description = 'Delete an Algorand smart contract application with an ABI method call'
 
 export const schema = z.object({
   sender: z
     .string()
-    .describe('The Algorand address that will delete the application (must be the creator)'),
-  appId: z.string().describe('The ID of the application to delete'),
+    .describe(
+      'The Algorand address that will delete the application (must be the creator of the application)'
+    ),
+  appId: z
+    .string()
+    .describe('The ID of the application to delete (numeric value as a string, e.g., "12345")'),
   method: z
     .string()
     .describe(
-      "The ABI method signature (e.g., 'add(uint64,uint64)uint64', 'greet()string', 'hello(string)void')"
+      'The ABI method signature to call before deletion (e.g., "cleanup()void", "finalize()string"). Format is methodName(paramType1,paramType2)returnType without spaces.'
     ),
   methodArgs: z
     .array(z.string())
     .optional()
-    .describe('Arguments for the method call, matching the types in the method signature'),
+    .describe(
+      'Arguments for the method call, matching the types in the method signature. For numeric types, use strings (e.g., "123" for uint64). For addresses, use standard Algorand addresses.'
+    ),
   onComplete: z
     .enum(['NoOp', 'OptIn', 'CloseOut'])
     .optional()
-    .describe('The on-completion action for this transaction (default: NoOp)'),
+    .describe(
+      'The on-completion action for this transaction (default: DeleteApplication). Note: This parameter is ignored for delete operations as DeleteApplication is always used.'
+    ),
   accountReferences: z
     .array(z.string())
     .optional()
-    .describe('Account addresses to be referenced in the transaction'),
+    .describe(
+      'Account addresses to be referenced in the transaction (accessible via "txna Accounts i" in TEAL)'
+    ),
   appReferences: z
     .array(z.string())
     .optional()
-    .describe('Application IDs to be referenced in the transaction'),
+    .describe(
+      'Application IDs to be referenced in the transaction (accessible via "txna Applications i" in TEAL)'
+    ),
   assetReferences: z
     .array(z.string())
     .optional()
-    .describe('Asset IDs to be referenced in the transaction'),
+    .describe(
+      'Asset IDs to be referenced in the transaction (accessible via "txna Assets i" in TEAL)'
+    ),
   boxReferences: z
     .array(
       z.union([
-        z.string().describe('Box name'),
+        z.string().describe('Box name (will be encoded as UTF-8 bytes)'),
         z.object({
-          name: z.string().describe('Box name'),
-          appId: z.string().optional().describe('Application ID (defaults to the called app)'),
+          name: z.string().describe('Box name (will be encoded as UTF-8 bytes)'),
+          appId: z
+            .string()
+            .optional()
+            .describe('Application ID (defaults to the called app if not specified)'),
         }),
       ])
     )
     .optional()
-    .describe('Box references to be included in the transaction'),
-  note: z.string().optional().describe('Optional note to include with the transaction'),
+    .describe('Box references to be included in the transaction (for accessing app box storage)'),
+  note: z
+    .string()
+    .optional()
+    .describe('Optional note to include with the transaction (will be encoded as UTF-8 bytes)'),
   lease: z
     .string()
     .optional()
-    .describe('Optional lease value (base64-encoded) to enforce mutual exclusion of transactions'),
+    .describe(
+      'Optional lease value (base64-encoded) to enforce mutual exclusion of transactions (prevents duplicate submissions)'
+    ),
 })
 
 // Helper function to convert onComplete string to algosdk enum
@@ -103,13 +125,17 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         sender,
         appId: BigInt(appId),
         method: abiMethod,
-        args: methodArgs,
+        methodArgs,
         suppressLog: true,
+        onComplete: algosdk.OnApplicationComplete.DeleteApplicationOC,
       }
 
       // Add optional parameters
       if (onComplete) {
-        txParams.onComplete = getOnCompleteEnum(onComplete)
+        // Note: For delete, we always use DeleteApplicationOC regardless of what's passed
+        console.warn(
+          'Ignoring onComplete parameter for delete operation, using DeleteApplicationOC'
+        )
       }
 
       if (accountReferences && accountReferences.length > 0) {
@@ -150,6 +176,33 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
 
+      // Extract logs if available
+      let logs: string[] = []
+      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
+        logs = txInfo.logs.map((log: Uint8Array) => {
+          try {
+            // Try to decode as UTF-8 string
+            const decoded = Buffer.from(log).toString('utf-8')
+            // Try to parse as JSON if it looks like JSON
+            if (
+              (decoded.startsWith('{') && decoded.endsWith('}')) ||
+              (decoded.startsWith('[') && decoded.endsWith(']'))
+            ) {
+              try {
+                const parsed = JSON.parse(decoded)
+                return `${JSON.stringify(parsed, null, 2)} (hex: ${Buffer.from(log).toString('hex')})`
+              } catch {
+                return `${decoded} (hex: ${Buffer.from(log).toString('hex')})`
+              }
+            }
+            return `${decoded} (hex: ${Buffer.from(log).toString('hex')})`
+          } catch (e) {
+            // Return as base64 if not valid UTF-8
+            return `Base64: ${Buffer.from(log).toString('base64')} (hex: ${Buffer.from(log).toString('hex')})`
+          }
+        })
+      }
+
       // Get the return value directly if available
       let returnValue = 'No return value'
       let returnDetails = []
@@ -189,16 +242,11 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
         ...returnDetails,
       ]
 
-      // Add raw logs to the response
-      if (txInfo && txInfo.logs && txInfo.logs.length > 0) {
-        appDetails.push(
-          ``,
-          `Raw Transaction Logs:`,
-          ...txInfo.logs.map(
-            log =>
-              `- ${Buffer.from(log).toString('utf-8')} (hex: ${Buffer.from(log).toString('hex')})`
-          )
-        )
+      // Add logs if available
+      if (logs.length > 0) {
+        appDetails.push(``, `Raw Transaction Logs:`, ...logs.map(log => `- ${log}`))
+      } else {
+        appDetails.push(``, `Raw Transaction Logs:`, `- No logs found in this transaction`)
       }
 
       return {

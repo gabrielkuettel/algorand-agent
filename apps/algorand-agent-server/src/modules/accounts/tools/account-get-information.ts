@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'aa__account_get_information'
+export const name = 'mcp__account_get_information'
 export const description = 'Get information about an Algorand account'
 
 export const schema = z.object({

@@ -16,37 +16,37 @@ MCP Server for Algorand blockchain interactions, enabling smart contract deploym
 
 ### Network Tools
 
-- `aa__get_network` - Get current network (localnet, testnet, mainnet)
-- `aa__set_network` - Set active network for subsequent operations
+- `mcp__get_network` - Get current network (localnet, testnet, mainnet)
+- `mcp__set_network` - Set active network for subsequent operations
 
 ### Account Tools
 
-- `aa__generate_account` - Create a new random Algorand account
-- `aa__account_get_information` - Get account balance and information
-- `aa__account_from_mnemonic` - Recover account from 25-word mnemonic
+- `mcp__generate_account` - Create a new random Algorand account
+- `mcp__account_get_information` - Get account balance and information
+- `mcp__account_from_mnemonic` - Recover account from 25-word mnemonic
 
 ### Transaction Tools
 
-- `aa__send_payment` - Send Algos between accounts
-- `aa__asset_create` - Create a new Algorand Standard Asset (ASA)
-- `aa__asset_config` - Modify asset configuration
-- `aa__asset_transfer` - Transfer assets between accounts
-- `aa__asset_opt_in` - Opt-in to receive an asset
-- `aa__asset_opt_out` - Opt-out of an asset
-- `aa__asset_freeze` - Freeze asset holdings
-- `aa__asset_destroy` - Destroy an asset
+- `mcp__send_payment` - Send Algos between accounts
+- `mcp__asset_create` - Create a new Algorand Standard Asset (ASA)
+- `mcp__asset_config` - Modify asset configuration
+- `mcp__asset_transfer` - Transfer assets between accounts
+- `mcp__asset_opt_in` - Opt-in to receive an asset
+- `mcp__asset_opt_out` - Opt-out of an asset
+- `mcp__asset_freeze` - Freeze asset holdings
+- `mcp__asset_destroy` - Destroy an asset
 
 ### Smart Contract Tools
 
-- `aa__app_call_method` - Call a method on an existing application
-- `aa__app_create_method_call` - Deploy a new application
-- `aa__app_update_method_call` - Update an existing application
-- `aa__app_delete_method_call` - Delete an application
+- `mcp__app_call_method` - Call a method on an existing application
+- `mcp__app_create_method_call` - Deploy a new application
+- `mcp__app_update_method_call` - Update an existing application
+- `mcp__app_delete_method_call` - Delete an application
 
 ### Utility Tools
 
-- `aa__dispenser_ensure_funded` - Fund an account on LocalNet
-- `aa__explorer_get_url` - Generate URL to view resources in Lora Explorer
+- `mcp__dispenser_ensure_funded` - Fund an account on LocalNet
+- `mcp__explorer_get_url` - Generate URL to view resources in Lora Explorer
 
 ## Network Support
 

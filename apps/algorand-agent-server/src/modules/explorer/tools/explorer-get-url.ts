@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'aa__explorer_get_url'
+export const name = 'mcp__explorer_get_url'
 export const description = 'Generate a URL to view an Algorand resource in Lora Explorer'
 
 export const schema = z.object({

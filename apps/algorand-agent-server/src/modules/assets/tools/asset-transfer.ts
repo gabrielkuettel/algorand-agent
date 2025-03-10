@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'aa__asset_transfer'
+export const name = 'mcp__asset_transfer'
 export const description = 'Transfer an Algorand Standard Asset (ASA) from one account to another'
 
 export const schema = z.object({
