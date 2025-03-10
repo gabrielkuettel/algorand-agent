@@ -3,13 +3,19 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'amcp__app_call_method'
+export const name = 'aa__app_update_method_call'
 export const description =
-  'Call a method on an Algorand smart contract using ABI (Application Binary Interface) - recommended for most application calls'
+  'Update an existing Algorand smart contract application with an ABI method call'
 
 export const schema = z.object({
-  sender: z.string().describe('The Algorand address that will call the application'),
-  appId: z.string().describe('The ID of the application to call'),
+  sender: z
+    .string()
+    .describe('The Algorand address that will update the application (must be the creator)'),
+  appId: z.string().describe('The ID of the application to update'),
+  approvalProgram: z.string().describe('The new TEAL approval program code for the application'),
+  clearStateProgram: z
+    .string()
+    .describe('The new TEAL clear state program code for the application'),
   method: z
     .string()
     .describe(
@@ -77,12 +83,14 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Safety check for mainnet operations
       if (network === 'mainnet') {
-        console.error('Warning: Application method call requested on mainnet')
+        console.error('Warning: Application update requested on mainnet')
       }
 
       const {
         sender,
         appId,
+        approvalProgram,
+        clearStateProgram,
         method,
         methodArgs = [],
         onComplete,
@@ -97,10 +105,12 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       // Parse the method signature to create an ABIMethod object
       const abiMethod = algosdk.ABIMethod.fromSignature(method)
 
-      // Create and send the transaction
+      // Create the transaction parameters
       const txParams: any = {
         sender,
         appId: BigInt(appId),
+        approvalProgram,
+        clearStateProgram,
         method: abiMethod,
         args: methodArgs,
         suppressLog: true,
@@ -145,7 +155,7 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
 
       // Send the transaction
-      const result = await algorand.send.appCallMethodCall(txParams)
+      const result = await algorand.send.appUpdateMethodCall(txParams)
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
 
@@ -181,16 +191,17 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Format the response
       const appDetails = [
-        `Application Method Call Successful:`,
+        `Application Updated Successfully:`,
         ``,
         `Application ID: ${appId}`,
-        `Caller: ${sender}`,
-        `Method: ${method}`,
+        `Updater: ${sender}`,
+        `Method Called: ${method}`,
         `Arguments: ${methodArgs.length > 0 ? methodArgs.join(', ') : 'None'}`,
         `On Complete: ${onComplete || 'NoOp'}`,
         ``,
         `Transaction Details:`,
         `Transaction ID: ${txId}`,
+        `Confirmation Round: ${txInfo?.confirmedRound || 'Pending'}`,
       ]
 
       // Add return value if available
@@ -223,13 +234,19 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       } else if (errorMessage.includes('return arg 0 wanted type uint64')) {
         helpfulTip =
           "TEAL expects method returns to be properly formatted. For strings, use 'log' instead of direct returns, or implement proper ARC-4 return formatting."
+      } else if (errorMessage.includes('program assembly failed')) {
+        helpfulTip =
+          "There's a syntax error in your TEAL code. Check for typos, missing opcodes, or incorrect arguments."
+      } else if (errorMessage.includes('not authorized')) {
+        helpfulTip =
+          "Only the original creator of the application can update it. Make sure you're using the correct sender address."
       }
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error calling application method: ${errorMessage}\n\n${
+            text: `Error updating application: ${errorMessage}\n\n${
               helpfulTip ? `Tip: ${helpfulTip}` : ''
             }`,
           },

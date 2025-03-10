@@ -3,7 +3,7 @@ import { algo } from '@algorandfoundation/algokit-utils'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'amcp__dispenser_ensure_funded'
+export const name = 'aa__dispenser_ensure_funded'
 export const description = 'Ensure an account has sufficient funds using the LocalNet dispenser'
 
 export const schema = z.object({

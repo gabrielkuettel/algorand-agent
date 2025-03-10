@@ -3,7 +3,7 @@ import { algo } from '@algorandfoundation/algokit-utils'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'amcp__send_payment'
+export const name = 'aa__send_payment'
 export const description = 'Send Algos from one account to another'
 
 export const schema = z.object({

@@ -3,7 +3,7 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import algosdk from 'algosdk'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'amcp__generate_account'
+export const name = 'aa__generate_account'
 export const description = 'Generate a new random Algorand account'
 
 export const schema = z.object({

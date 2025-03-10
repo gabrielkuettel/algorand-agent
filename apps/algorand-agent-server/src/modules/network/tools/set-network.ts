@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'amcp__set_network'
+export const name = 'aa__set_network'
 export const description = 'Set the current Algorand network to use'
 
 export const schema = z.object({

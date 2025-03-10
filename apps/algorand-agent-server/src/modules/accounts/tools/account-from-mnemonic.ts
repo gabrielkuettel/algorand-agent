@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'amcp__account_from_mnemonic'
+export const name = 'aa__account_from_mnemonic'
 export const description = 'Create an Algorand account from a mnemonic phrase'
 
 export const schema = z.object({

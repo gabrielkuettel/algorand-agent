@@ -5,7 +5,9 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerAccountTools } from '@/modules/accounts/index.js'
 import { registerDispenserTools } from '@/modules/dispenser/index.js'
 import { registerExplorerTools } from '@/modules/explorer/index.js'
-import { registerTransactionTools } from '@/modules/transactions/index.js'
+import { registerPaymentTools } from '@/modules/transactions/index.js'
+import { registerAssetTools } from '@/modules/assets/index.js'
+import { registerAppTools } from '@/modules/apps/index.js'
 import { NetworkContext, registerNetwork } from '@/modules/network/index.js'
 
 // Create network context with localnet default
@@ -27,7 +29,9 @@ registerNetwork(server, networkContext)
 registerAccountTools(server, networkContext)
 registerDispenserTools(server, networkContext)
 registerExplorerTools(server, networkContext)
-registerTransactionTools(server, networkContext)
+registerPaymentTools(server, networkContext)
+registerAssetTools(server, networkContext)
+registerAppTools(server, networkContext)
 
 async function runServer() {
   const transport = new StdioServerTransport()
@@ -36,7 +40,6 @@ async function runServer() {
   console.error('Algorand MCP Server running on stdio')
 }
 
-// Run the server
 runServer().catch(err => {
   console.error('Error running server:', err)
   process.exit(1)

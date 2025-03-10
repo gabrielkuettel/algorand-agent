@@ -1,6 +1,6 @@
 {
   "name": "algorand-agent-server",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "MCP server for Algorand blockchain interactions",
   "license": "MIT",
   "type": "module",

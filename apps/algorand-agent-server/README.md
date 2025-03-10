@@ -16,37 +16,37 @@ MCP Server for Algorand blockchain interactions, enabling smart contract deploym
 
 ### Network Tools
 
-- `amcp__get_network` - Get current network (localnet, testnet, mainnet)
-- `amcp__set_network` - Set active network for subsequent operations
+- `aa__get_network` - Get current network (localnet, testnet, mainnet)
+- `aa__set_network` - Set active network for subsequent operations
 
 ### Account Tools
 
-- `amcp__generate_account` - Create a new random Algorand account
-- `amcp__account_get_information` - Get account balance and information
-- `amcp__account_from_mnemonic` - Recover account from 25-word mnemonic
+- `aa__generate_account` - Create a new random Algorand account
+- `aa__account_get_information` - Get account balance and information
+- `aa__account_from_mnemonic` - Recover account from 25-word mnemonic
 
 ### Transaction Tools
 
-- `amcp__send_payment` - Send Algos between accounts
-- `amcp__asset_create` - Create a new Algorand Standard Asset (ASA)
-- `amcp__asset_config` - Modify asset configuration
-- `amcp__asset_transfer` - Transfer assets between accounts
-- `amcp__asset_opt_in` - Opt-in to receive an asset
-- `amcp__asset_opt_out` - Opt-out of an asset
-- `amcp__asset_freeze` - Freeze asset holdings
-- `amcp__asset_destroy` - Destroy an asset
+- `aa__send_payment` - Send Algos between accounts
+- `aa__asset_create` - Create a new Algorand Standard Asset (ASA)
+- `aa__asset_config` - Modify asset configuration
+- `aa__asset_transfer` - Transfer assets between accounts
+- `aa__asset_opt_in` - Opt-in to receive an asset
+- `aa__asset_opt_out` - Opt-out of an asset
+- `aa__asset_freeze` - Freeze asset holdings
+- `aa__asset_destroy` - Destroy an asset
 
 ### Smart Contract Tools
 
-- `amcp__app_call_method` - Call a method on an existing application
-- `amcp__app_create_method_call` - Deploy a new application
-- `amcp__app_update_method_call` - Update an existing application
-- `amcp__app_delete_method_call` - Delete an application
+- `aa__app_call_method` - Call a method on an existing application
+- `aa__app_create_method_call` - Deploy a new application
+- `aa__app_update_method_call` - Update an existing application
+- `aa__app_delete_method_call` - Delete an application
 
 ### Utility Tools
 
-- `amcp__dispenser_ensure_funded` - Fund an account on LocalNet
-- `amcp__explorer_get_url` - Generate URL to view resources in Lora Explorer
+- `aa__dispenser_ensure_funded` - Fund an account on LocalNet
+- `aa__explorer_get_url` - Generate URL to view resources in Lora Explorer
 
 ## Network Support
 
@@ -80,7 +80,7 @@ Configure in Claude Desktop (`~/Library/Application\ Support/Claude/claude_deskt
 ```json
 {
   "mcpServers": {
-    "algorand-mcp": {
+    "algorand-agent": {
       "command": "npx",
       "args": ["-y", "algorand-mcp"]
     }
@@ -95,7 +95,7 @@ Configure in Claude Desktop:
 ```json
 {
   "mcpServers": {
-    "algorand-mcp": {
+    "algorand-agent": {
       "command": "docker",
       "args": ["run", "-i", "--rm", "gabrielkuettel/algorand-mcp"]
     }
@@ -126,7 +126,7 @@ You can also configure project-specific MCP servers in Cursor using a `.cursor/m
 ```json
 {
   "mcpServers": {
-    "algorand-mcp": {
+    "algorand-agent": {
       "command": "npx",
       "args": ["-y", "algorand-mcp"]
     }

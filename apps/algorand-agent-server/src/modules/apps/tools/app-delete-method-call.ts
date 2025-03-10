@@ -3,14 +3,14 @@ import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 import algosdk from 'algosdk'
 
-export const name = 'amcp__app_create_method_call'
-export const description =
-  'Create a new Algorand smart contract application with an ABI method call'
+export const name = 'aa__app_delete_method_call'
+export const description = 'Delete an Algorand smart contract application with an ABI method call'
 
 export const schema = z.object({
-  sender: z.string().describe('The Algorand address that will create the application'),
-  approvalProgram: z.string().describe('The TEAL approval program code for the application'),
-  clearStateProgram: z.string().describe('The TEAL clear state program code for the application'),
+  sender: z
+    .string()
+    .describe('The Algorand address that will delete the application (must be the creator)'),
+  appId: z.string().describe('The ID of the application to delete'),
   method: z
     .string()
     .describe(
@@ -20,11 +20,6 @@ export const schema = z.object({
     .array(z.string())
     .optional()
     .describe('Arguments for the method call, matching the types in the method signature'),
-  globalInts: z.number().optional().describe('Number of global integer variables (default: 0)'),
-  globalBytes: z.number().optional().describe('Number of global byte slice variables (default: 0)'),
-  localInts: z.number().optional().describe('Number of local integer variables (default: 0)'),
-  localBytes: z.number().optional().describe('Number of local byte slice variables (default: 0)'),
-  extraPages: z.number().optional().describe('Number of extra program pages (default: 0)'),
   onComplete: z
     .enum(['NoOp', 'OptIn', 'CloseOut'])
     .optional()
@@ -83,20 +78,14 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Safety check for mainnet operations
       if (network === 'mainnet') {
-        console.error('Warning: Application creation requested on mainnet')
+        console.error('Warning: Application deletion requested on mainnet')
       }
 
       const {
         sender,
-        approvalProgram,
-        clearStateProgram,
+        appId,
         method,
         methodArgs = [],
-        globalInts,
-        globalBytes,
-        localInts,
-        localBytes,
-        extraPages,
         onComplete,
         accountReferences,
         appReferences,
@@ -112,31 +101,10 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       // Create the transaction parameters
       const txParams: any = {
         sender,
-        approvalProgram,
-        clearStateProgram,
+        appId: BigInt(appId),
         method: abiMethod,
         args: methodArgs,
         suppressLog: true,
-      }
-
-      // Add schema if provided
-      if (
-        globalInts !== undefined ||
-        globalBytes !== undefined ||
-        localInts !== undefined ||
-        localBytes !== undefined
-      ) {
-        txParams.schema = {
-          globalInts: globalInts || 0,
-          globalByteSlices: globalBytes || 0,
-          localInts: localInts || 0,
-          localByteSlices: localBytes || 0,
-        }
-      }
-
-      // Add extra pages if provided
-      if (extraPages !== undefined) {
-        txParams.extraProgramPages = extraPages
       }
 
       // Add optional parameters
@@ -178,12 +146,9 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       }
 
       // Send the transaction
-      const result = await algorand.send.appCreateMethodCall(txParams)
+      const result = await algorand.send.appDeleteMethodCall(txParams)
       const txId = result.transaction.txID()
       const txInfo = result.confirmation
-
-      // Get the application ID
-      const appId = txInfo?.applicationIndex || 'unknown'
 
       // Extract logs if available
       let logs: string[] = []
@@ -217,10 +182,10 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
 
       // Format the response
       const appDetails = [
-        `Application Created Successfully:`,
+        `Application Deleted Successfully:`,
         ``,
         `Application ID: ${appId}`,
-        `Creator: ${sender}`,
+        `Deleter: ${sender}`,
         `Method Called: ${method}`,
         `Arguments: ${methodArgs.length > 0 ? methodArgs.join(', ') : 'None'}`,
         `On Complete: ${onComplete || 'NoOp'}`,
@@ -257,19 +222,16 @@ export function createHandler(networkContext: NetworkContext): ToolCallback<type
       } else if (errorMessage.includes('err opcode executed')) {
         helpfulTip =
           "The contract explicitly rejected the transaction with an 'err' opcode. Check your TEAL logic and arguments."
-      } else if (errorMessage.includes('return arg 0 wanted type uint64')) {
+      } else if (errorMessage.includes('not authorized')) {
         helpfulTip =
-          "TEAL expects method returns to be properly formatted. For strings, use 'log' instead of direct returns, or implement proper ARC-4 return formatting."
-      } else if (errorMessage.includes('program assembly failed')) {
-        helpfulTip =
-          "There's a syntax error in your TEAL code. Check for typos, missing opcodes, or incorrect arguments."
+          "Only the original creator of the application can delete it. Make sure you're using the correct sender address."
       }
 
       return {
         content: [
           {
             type: 'text',
-            text: `Error creating application: ${errorMessage}\n\n${
+            text: `Error deleting application: ${errorMessage}\n\n${
               helpfulTip ? `Tip: ${helpfulTip}` : ''
             }`,
           },

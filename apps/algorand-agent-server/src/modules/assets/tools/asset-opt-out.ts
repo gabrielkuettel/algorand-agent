@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { NetworkContext } from '@/common/network-context.js'
 
-export const name = 'amcp__asset_opt_out'
+export const name = 'aa__asset_opt_out'
 export const description = 'Opt an account out of an Algorand Standard Asset (ASA)'
 
 export const schema = z.object({
