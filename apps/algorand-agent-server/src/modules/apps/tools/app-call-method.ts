@@ -13,7 +13,7 @@ export const schema = z.object({
   method: z
     .string()
     .describe(
-      "The ABI method signature (e.g., 'add(uint64,uint64)', 'greet()', 'hello(string)void')"
+      "The ABI method signature (e.g., 'add(uint64,uint64)uint64', 'greet()string', 'hello(string)void')"
     ),
   methodArgs: z
     .array(z.string())
